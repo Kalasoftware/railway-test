@@ -46,5 +46,30 @@ railway up
 
 ### once you start upload , its show realtime progress also ... 
 
+👤 Author
+🔹 Sumeet Patel aka Arch Linux Enthusiast
+🔹 GitHub: Sumeet Patel
+🔹 Telegram: @your-telegram-handle
+
+
+---
+
+## **📌 What's Included?**
+- **Full setup instructions** (local & Railway deployment)  
+- **How to use the bot** (commands with examples)  
+- **Credits to you** (`Sumeet Patel aka Arch Linux Enthusiast`)  
+- **License & Contribution details**  
+
+---
+
+## **🚀 Next Steps**
+1. **Create `README.md`** in your GitHub repo  
+2. **Copy & paste this content**  
+3. **Commit & push** to your repo  
+4. **Star your own repo & share!** ⭐  
+
+---
+
+🚀 **Let me know if you want any modifications!** 😃
 
 
