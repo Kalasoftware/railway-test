@@ -27,9 +27,9 @@ function uploadToFTP(url, chatId) {
     const filename = path.basename(new URL(url).pathname);
 
     // Define the full destination path with filename
-    const destination = `myftp:/uploads/${filename}`;
+    const destination = `myftp:arch/uploads/${filename}`;
 
-    // Write the Rclone config to a file using cat
+    // Write the Rclone config
     const rcloneConfigCommand = `
         cat <<EOT > /app/rclone.conf
         [myftp]
@@ -41,13 +41,13 @@ function uploadToFTP(url, chatId) {
     `;
 
     // Run the command to write config and execute Rclone
-    const rcloneCommand = `${rcloneConfigCommand} && rclone --config /app/rclone.conf copyurl "${url}" "${destination}"`;
+    const rcloneCommand = `${rcloneConfigCommand} && rclone --config /app/rclone.conf copyurl "${url}" "${destination}" -v`;
 
     exec(rcloneCommand, (error, stdout, stderr) => {
         if (error) {
             bot.sendMessage(chatId, `❌ Upload failed: ${stderr}`);
         } else {
-            bot.sendMessage(chatId, `✅ Upload complete: ${filename}`);
+            bot.sendMessage(chatId, `✅ Upload complete: ${filename}\n\nLogs:\n${stdout}`);
         }
     });
 }
