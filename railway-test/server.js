@@ -14,15 +14,11 @@ const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 const FTP_REMOTE = "myftp:/uploads";
 
 function writeRcloneConfig() {
-    return `
-        cat <<EOT > /app/rclone.conf
-[myftp]
+    return `echo "[myftp]
 type = ftp
 host = ${process.env.FTP_HOST}
 user = ${process.env.FTP_USER}
-pass = ${process.env.FTP_PASS}
-EOT
-    `;
+pass = ${process.env.FTP_PASS}" > /app/rclone.conf`;
 }
 
 
