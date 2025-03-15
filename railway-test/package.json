@@ -7,6 +7,7 @@
     "express": "^4.18.2"
   },
   "scripts": {
-    "start": "bash install-rclone.sh && node server.js"
+    "build": "bash install-rclone.sh", 
+    "start": "node server.js"
   }
 }
