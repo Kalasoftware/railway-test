@@ -19,16 +19,24 @@ bot.onText(/\/start/, (msg) => {
 });
 
 // Function to copy file from URL to FTP
+const path = require("path");
+
 function uploadToFTP(url, chatId) {
     bot.sendMessage(chatId, `🚀 Uploading from URL: ${url} to FTP...`);
 
-    const rcloneCommand = `echo "${process.env.RCLONE_CONFIG}" > /app/rclone.conf && rclone --config /app/rclone.conf copyurl "${url}" "myftp:/uploads/"`;
+    // Extract filename from URL
+    const filename = path.basename(new URL(url).pathname);
+
+    // Define the full destination path with filename
+    const destination = `myftp:/uploads/${filename}`;
+
+    const rcloneCommand = `echo "${process.env.RCLONE_CONFIG}" > /app/rclone.conf && rclone --config /app/rclone.conf copyurl "${url}" "${destination}"`;
 
     exec(rcloneCommand, (error, stdout, stderr) => {
         if (error) {
             bot.sendMessage(chatId, `❌ Upload failed: ${stderr}`);
         } else {
-            bot.sendMessage(chatId, `✅ Upload complete!`);
+            bot.sendMessage(chatId, `✅ Upload complete: ${filename}`);
         }
     });
 }
