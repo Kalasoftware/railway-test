@@ -28,7 +28,7 @@ function uploadToFTP(url, chatId) {
     const filename = path.basename(new URL(url).pathname);
 
     // Define the full destination path with filename
-    const destination = `myftp:/uploads/${filename}`;
+    const destination = `myftp:arch/uploads/${filename}`;
 
     const rcloneCommand = `echo "${process.env.RCLONE_CONFIG}" > /app/rclone.conf && rclone --config /app/rclone.conf copyurl "${url}" "${destination}"`;
 
