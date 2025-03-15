@@ -1,0 +1,12 @@
+{
+    "name": "telegram-rclone-bot",
+    "version": "1.0.0",
+    "main": "server.js",
+    "dependencies": {
+      "node-telegram-bot-api": "^0.61.0"
+    },
+    "scripts": {
+      "start": "bash install-rclone.sh && node server.js"
+    }
+  }
+  
