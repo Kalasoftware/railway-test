@@ -33,10 +33,14 @@ pass = ${process.env.FTP_PASS}
 
 // Handle "/start" command
 bot.onText(/\/start/, (msg) => {
-    bot.sendMessage(msg.chat.id, "Send a URL to upload to FTP. Use `|` to separate multiple links.\nExample:\n`/upload link1 | link2 | link3`", { parse_mode: "Markdown" });
+    bot.sendMessage(
+        msg.chat.id,
+        "Send a URL to upload to FTP. Use `|` to separate multiple links.\nExample:\n`/upload link1 | link2 | link3`",
+        { parse_mode: "Markdown" }
+    );
 });
 
-// Function to Copy File from URL to FTP with Progress Tracking
+// Function to Copy File from URL to FTP and Send 50% Progress Update
 function uploadToFTP(url, chatId) {
     bot.sendMessage(chatId, `🚀 Uploading from URL: ${url} to FTP...`);
 
@@ -48,31 +52,42 @@ function uploadToFTP(url, chatId) {
             return bot.sendMessage(chatId, "❌ Failed to write Rclone config.");
         }
 
-        // Start Rclone upload with progress tracking
-        const rcloneCommand = `rclone --config /app/rclone.conf copyurl "${url}" "${destination}" --progress`;
-
-        const process = exec(rcloneCommand);
-
-        // Capture progress updates
-        process.stdout.on("data", (data) => {
-            const progressMatch = data.match(/Transferred:\s+([\d.]+ \w+)/);
-            if (progressMatch) {
-                bot.sendMessage(chatId, `⬆️ Uploading: ${progressMatch[1]}`);
+        // Get the file size before downloading
+        exec(`rclone size "${url}"`, (err, stdout) => {
+            let fileSizeMB = null;
+            if (!err) {
+                const match = stdout.match(/Total size:\s+([\d.]+)M/);
+                if (match) {
+                    fileSizeMB = parseFloat(match[1]);
+                }
             }
-        });
 
-        // Capture errors
-        process.stderr.on("data", (data) => {
-            bot.sendMessage(chatId, `❌ Upload error:\n${data}`);
-        });
+            const rcloneCommand = `rclone --config /app/rclone.conf copyurl "${url}" "${destination}" --progress`;
 
-        // Notify when upload completes
-        process.on("close", (code) => {
-            if (code === 0) {
-                bot.sendMessage(chatId, `✅ Upload complete: ${filename}`);
-            } else {
-                bot.sendMessage(chatId, `❌ Upload failed with code ${code}`);
-            }
+            const process = exec(rcloneCommand);
+
+            let halfUploaded = false;
+
+            process.stdout.on("data", (data) => {
+                if (fileSizeMB) {
+                    const match = data.match(/Transferred:\s+([\d.]+)M/);
+                    if (match) {
+                        const uploadedMB = parseFloat(match[1]);
+                        if (uploadedMB >= fileSizeMB / 2 && !halfUploaded) {
+                            bot.sendMessage(chatId, `📡 50% uploaded: ${filename}`);
+                            halfUploaded = true;
+                        }
+                    }
+                }
+            });
+
+            process.on("close", (code) => {
+                if (code === 0) {
+                    bot.sendMessage(chatId, `✅ Upload complete: ${filename}`);
+                } else {
+                    bot.sendMessage(chatId, `❌ Upload failed with code ${code}`);
+                }
+            });
         });
     });
 }
