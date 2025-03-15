@@ -29,10 +29,19 @@ function uploadToFTP(url, chatId) {
     // Define the full destination path with filename
     const destination = `myftp:/uploads/${filename}`;
 
-    // Correctly write the Rclone config
-    const rcloneConfig = `[myftp]\ntype = ftp\nhost = ${process.env.FTP_HOST}\nuser = ${process.env.FTP_USER}\npass = ${process.env.FTP_PASS}\n`;
+    // Write the Rclone config to a file using cat
+    const rcloneConfigCommand = `
+        cat <<EOT > /app/rclone.conf
+        [myftp]
+        type = ftp
+        host = ${process.env.FTP_HOST}
+        user = ${process.env.FTP_USER}
+        pass = ${process.env.FTP_PASS}
+        EOT
+    `;
 
-    const rcloneCommand = `echo -e '${rcloneConfig}' > /app/rclone.conf && rclone --config /app/rclone.conf copyurl "${url}" "${destination}"`;
+    // Run the command to write config and execute Rclone
+    const rcloneCommand = `${rcloneConfigCommand} && rclone --config /app/rclone.conf copyurl "${url}" "${destination}"`;
 
     exec(rcloneCommand, (error, stdout, stderr) => {
         if (error) {
