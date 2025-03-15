@@ -1,16 +1,16 @@
-const express = require('express');
-const TelegramBot = require('node-telegram-bot-api');
-const { exec } = require('child_process');
-const path = require('path');
+const express = require("express");
+const TelegramBot = require("node-telegram-bot-api");
+const { exec } = require("child_process");
+const path = require("path");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Replace with your Telegram bot token
+// Telegram Bot Token from Railway Environment Variables
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
-// Replace with your FTP remote name in rclone
+// FTP Remote Name
 const FTP_REMOTE = "myftp:/uploads";
 
 // Handle "/start" command
@@ -19,7 +19,6 @@ bot.onText(/\/start/, (msg) => {
 });
 
 // Function to copy file from URL to FTP
-
 function uploadToFTP(url, chatId) {
     bot.sendMessage(chatId, `🚀 Uploading from URL: ${url} to FTP...`);
 
@@ -27,31 +26,32 @@ function uploadToFTP(url, chatId) {
     const filename = path.basename(new URL(url).pathname);
 
     // Define the full destination path with filename
-    const destination = `myftp:arch/uploads/${filename}`;
+    const destination = `${FTP_REMOTE}/${filename}`;
 
-    // Write the Rclone config
+    // Ensure Rclone config is written correctly
     const rcloneConfigCommand = `
         cat <<EOT > /app/rclone.conf
-        [myftp]
-        type = ftp
-        host = ${process.env.FTP_HOST}
-        user = ${process.env.FTP_USER}
-        pass = ${process.env.FTP_PASS}
-        EOT
+[myftp]
+type = ftp
+host = ${process.env.FTP_HOST}
+user = ${process.env.FTP_USER}
+pass = ${process.env.FTP_PASS}
+EOT
     `;
 
-    // Run the command to write config and execute Rclone
-    const rcloneCommand = `${rcloneConfigCommand} && rclone --config /app/rclone.conf copyurl "${url}" "${destination}" -v`;
+    // Execute Rclone command
+    const rcloneCommand = `${rcloneConfigCommand} && rclone --config /app/rclone.conf copyurl "${url}" "${destination}" -vv`;
 
     exec(rcloneCommand, (error, stdout, stderr) => {
         if (error) {
-            bot.sendMessage(chatId, `❌ Upload failed: ${stderr}`);
+            bot.sendMessage(chatId, `❌ Upload failed:\n${stderr}`);
         } else {
             bot.sendMessage(chatId, `✅ Upload complete: ${filename}\n\nLogs:\n${stdout}`);
         }
     });
 }
-// Telegram Bot Command Listener for /upload
+
+// Handle "/upload" command
 bot.onText(/\/upload (.+)/, (msg, match) => {
     const chatId = msg.chat.id;
     const url = match[1].trim();
@@ -65,9 +65,9 @@ bot.onText(/\/upload (.+)/, (msg, match) => {
 
 // Command to list uploaded files
 bot.onText(/\/list/, (msg) => {
-    exec(`rclone ls "${FTP_REMOTE}"`, (error, stdout, stderr) => {
+    exec(`rclone --config /app/rclone.conf ls "${FTP_REMOTE}"`, (error, stdout, stderr) => {
         if (error) {
-            bot.sendMessage(msg.chat.id, `❌ Error: ${stderr}`);
+            bot.sendMessage(msg.chat.id, `❌ Error listing files:\n${stderr}`);
         } else {
             bot.sendMessage(msg.chat.id, stdout || "No files found.");
         }
@@ -81,8 +81,9 @@ bot.onText(/\/status/, (msg) => {
     });
 });
 
-app.get('/', (req, res) => {
-    res.send('Node.js Telegram FTP Uploader is Running!');
+// Express Route to Check if Server is Running
+app.get("/", (req, res) => {
+    res.send("Node.js Telegram FTP Uploader is Running!");
 });
 
 app.listen(PORT, () => {
