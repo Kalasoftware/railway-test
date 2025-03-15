@@ -13,6 +13,9 @@ const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 // FTP Remote Name
 const FTP_REMOTE = "myftp:/uploads";
 
+// Track active downloads
+const activeDownloads = new Map();
+
 // Function to Write Rclone Config
 function writeRcloneConfig(callback) {
     const configContent = `[myftp]
@@ -35,16 +38,15 @@ pass = ${process.env.FTP_PASS}
 bot.onText(/\/start/, (msg) => {
     bot.sendMessage(
         msg.chat.id,
-        "Send a URL to upload to FTP. Use `|` to separate multiple links.\nExample:\n`/upload link1 | link2 | link3`",
+        "Send a URL to upload to FTP. Use `|` to separate multiple links or specify a filename.\n\n**Examples:**\n`/upload link1 | filename.mp4`\n`/upload link2`\n\nDelete Files: `/delete filename.ext`\nStop Download: `/stop filename.ext`",
         { parse_mode: "Markdown" }
     );
 });
 
-// Function to Copy File from URL to FTP and Send 50% Progress Update
-function uploadToFTP(url, chatId) {
-    bot.sendMessage(chatId, `🚀 Uploading from URL: ${url} to FTP...`);
+// Function to Copy File from URL to FTP
+function uploadToFTP(url, filename, chatId) {
+    bot.sendMessage(chatId, `🚀 Uploading: ${filename} from URL: ${url} to FTP...`);
 
-    const filename = path.basename(new URL(url).pathname);
     const destination = `${FTP_REMOTE}/${filename}`;
 
     writeRcloneConfig((error) => {
@@ -52,42 +54,21 @@ function uploadToFTP(url, chatId) {
             return bot.sendMessage(chatId, "❌ Failed to write Rclone config.");
         }
 
-        // Get the file size before downloading
-        exec(`rclone size "${url}"`, (err, stdout) => {
-            let fileSizeMB = null;
-            if (!err) {
-                const match = stdout.match(/Total size:\s+([\d.]+)M/);
-                if (match) {
-                    fileSizeMB = parseFloat(match[1]);
-                }
+        // Start Rclone upload
+        const rcloneCommand = `rclone --config /app/rclone.conf copyurl "${url}" "${destination}" --stats=10s`;
+
+        const process = exec(rcloneCommand);
+
+        // Store process ID for stopping
+        activeDownloads.set(filename, process);
+
+        process.on("close", (code) => {
+            activeDownloads.delete(filename); // Remove from active downloads
+            if (code === 0) {
+                bot.sendMessage(chatId, `✅ Upload complete: ${filename}`);
+            } else {
+                bot.sendMessage(chatId, `❌ Upload failed for ${filename} with code ${code}`);
             }
-
-            const rcloneCommand = `rclone --config /app/rclone.conf copyurl "${url}" "${destination}" --progress`;
-
-            const process = exec(rcloneCommand);
-
-            let halfUploaded = false;
-
-            process.stdout.on("data", (data) => {
-                if (fileSizeMB) {
-                    const match = data.match(/Transferred:\s+([\d.]+)M/);
-                    if (match) {
-                        const uploadedMB = parseFloat(match[1]);
-                        if (uploadedMB >= fileSizeMB / 2 && !halfUploaded) {
-                            bot.sendMessage(chatId, `📡 50% uploaded: ${filename}`);
-                            halfUploaded = true;
-                        }
-                    }
-                }
-            });
-
-            process.on("close", (code) => {
-                if (code === 0) {
-                    bot.sendMessage(chatId, `✅ Upload complete: ${filename}`);
-                } else {
-                    bot.sendMessage(chatId, `❌ Upload failed with code ${code}`);
-                }
-            });
         });
     });
 }
@@ -95,19 +76,59 @@ function uploadToFTP(url, chatId) {
 // Handle "/upload" Command for Multiple Files Using Pipe (`|`)
 bot.onText(/\/upload (.+)/, (msg, match) => {
     const chatId = msg.chat.id;
-    const urls = match[1].trim().split("|").map(url => url.trim()); // Split by `|` and remove spaces
+    const inputEntries = match[1].trim().split("|").map(entry => entry.trim());
 
-    if (urls.length === 0) {
+    if (inputEntries.length === 0) {
         return bot.sendMessage(chatId, "❌ Please provide at least one URL.");
     }
 
-    urls.forEach((url) => {
+    inputEntries.forEach(entry => {
+        const parts = entry.split(" ");
+        const url = parts[0];
+        const filename = parts[1] ? parts[1] : path.basename(new URL(url).pathname);
+
         if (url.startsWith("http")) {
-            uploadToFTP(url, chatId);
+            uploadToFTP(url, filename, chatId);
         } else {
             bot.sendMessage(chatId, `⚠️ Skipping invalid URL: ${url}`);
         }
     });
+});
+
+// Handle "/delete" Command to Remove File from FTP
+bot.onText(/\/delete (.+)/, (msg, match) => {
+    const chatId = msg.chat.id;
+    const filename = match[1].trim();
+    const filePath = `${FTP_REMOTE}/${filename}`;
+
+    writeRcloneConfig((error) => {
+        if (error) {
+            return bot.sendMessage(chatId, "❌ Failed to write Rclone config.");
+        }
+
+        exec(`rclone --config /app/rclone.conf delete "${filePath}"`, (error, stdout, stderr) => {
+            if (error) {
+                bot.sendMessage(chatId, `❌ Error deleting file:\n${stderr}`);
+            } else {
+                bot.sendMessage(chatId, `🗑️ Deleted file: ${filename}`);
+            }
+        });
+    });
+});
+
+// Handle "/stop" Command to Stop Ongoing Download
+bot.onText(/\/stop (.+)/, (msg, match) => {
+    const chatId = msg.chat.id;
+    const filename = match[1].trim();
+
+    if (activeDownloads.has(filename)) {
+        const process = activeDownloads.get(filename);
+        process.kill("SIGTERM");
+        activeDownloads.delete(filename);
+        bot.sendMessage(chatId, `⛔ Download stopped for: ${filename}`);
+    } else {
+        bot.sendMessage(chatId, `⚠️ No active download found for: ${filename}`);
+    }
 });
 
 // Command to List Uploaded Files
