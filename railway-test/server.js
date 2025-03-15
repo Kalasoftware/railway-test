@@ -13,6 +13,19 @@ const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 // FTP Remote Name
 const FTP_REMOTE = "myftp:/uploads";
 
+function writeRcloneConfig() {
+    return `
+        cat <<EOT > /app/rclone.conf
+[myftp]
+type = ftp
+host = ${process.env.FTP_HOST}
+user = ${process.env.FTP_USER}
+pass = ${process.env.FTP_PASS}
+EOT
+    `;
+}
+
+
 // Handle "/start" command
 bot.onText(/\/start/, (msg) => {
     bot.sendMessage(msg.chat.id, "Send a URL to upload to FTP.");
@@ -22,25 +35,10 @@ bot.onText(/\/start/, (msg) => {
 function uploadToFTP(url, chatId) {
     bot.sendMessage(chatId, `🚀 Uploading from URL: ${url} to FTP...`);
 
-    // Extract filename from URL
     const filename = path.basename(new URL(url).pathname);
-
-    // Define the full destination path with filename
     const destination = `${FTP_REMOTE}/${filename}`;
 
-    // Ensure Rclone config is written correctly
-    const rcloneConfigCommand = `
-        cat <<EOT > /app/rclone.conf
-[myftp]
-type = ftp
-host = ${process.env.FTP_HOST}
-user = ${process.env.FTP_USER}
-pass = ${process.env.FTP_PASS}
-EOT
-    `;
-
-    // Execute Rclone command
-    const rcloneCommand = `${rcloneConfigCommand} && rclone --config /app/rclone.conf copyurl "${url}" "${destination}" -vv`;
+    const rcloneCommand = `${writeRcloneConfig()} && rclone --config /app/rclone.conf copyurl "${url}" "${destination}" -vv`;
 
     exec(rcloneCommand, (error, stdout, stderr) => {
         if (error) {
@@ -50,6 +48,7 @@ EOT
         }
     });
 }
+
 
 // Handle "/upload" command
 bot.onText(/\/upload (.+)/, (msg, match) => {
@@ -65,19 +64,27 @@ bot.onText(/\/upload (.+)/, (msg, match) => {
 
 // Command to list uploaded files
 bot.onText(/\/list/, (msg) => {
-    exec(`rclone --config /app/rclone.conf ls "${FTP_REMOTE}"`, (error, stdout, stderr) => {
+    const chatId = msg.chat.id;
+
+    const listCommand = `${writeRcloneConfig()} && rclone --config /app/rclone.conf ls "${FTP_REMOTE}"`;
+
+    exec(listCommand, (error, stdout, stderr) => {
         if (error) {
-            bot.sendMessage(msg.chat.id, `❌ Error listing files:\n${stderr}`);
+            bot.sendMessage(chatId, `❌ Error listing files:\n${stderr}`);
         } else {
-            bot.sendMessage(msg.chat.id, stdout || "No files found.");
+            bot.sendMessage(chatId, stdout || "No files found.");
         }
     });
 });
 
 // Status command to check active rclone processes
 bot.onText(/\/status/, (msg) => {
-    exec("ps aux | grep rclone", (error, stdout) => {
-        bot.sendMessage(msg.chat.id, stdout || "No active uploads.");
+    const chatId = msg.chat.id;
+
+    const statusCommand = `${writeRcloneConfig()} && ps aux | grep rclone`;
+
+    exec(statusCommand, (error, stdout) => {
+        bot.sendMessage(chatId, stdout || "No active uploads.");
     });
 });
 
