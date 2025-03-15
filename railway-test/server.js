@@ -20,9 +20,11 @@ bot.onText(/\/start/, (msg) => {
 
 // Function to copy file from URL to FTP
 function uploadToFTP(url, chatId) {
-    bot.sendMessage(chatId, `🚀 Uploading from URL: ${url}...`);
+    bot.sendMessage(chatId, `🚀 Uploading from URL: ${url} to FTP...`);
 
-    exec(`rclone copyurl "${url}" "${FTP_REMOTE}"`, (error, stdout, stderr) => {
+    const rcloneCommand = `echo "${process.env.RCLONE_CONFIG}" > /app/rclone.conf && rclone --config /app/rclone.conf copyurl "${url}" "myftp:/uploads/"`;
+
+    exec(rcloneCommand, (error, stdout, stderr) => {
         if (error) {
             bot.sendMessage(chatId, `❌ Upload failed: ${stderr}`);
         } else {
