@@ -19,7 +19,6 @@ bot.onText(/\/start/, (msg) => {
 });
 
 // Function to copy file from URL to FTP
-const path = require("path");
 
 function uploadToFTP(url, chatId) {
     bot.sendMessage(chatId, `🚀 Uploading from URL: ${url} to FTP...`);
