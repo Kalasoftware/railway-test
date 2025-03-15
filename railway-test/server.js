@@ -27,9 +27,12 @@ function uploadToFTP(url, chatId) {
     const filename = path.basename(new URL(url).pathname);
 
     // Define the full destination path with filename
-    const destination = `myftp:arch/uploads/${filename}`;
+    const destination = `myftp:/uploads/${filename}`;
 
-    const rcloneCommand = `echo "${process.env.RCLONE_CONFIG}" > /app/rclone.conf && rclone --config /app/rclone.conf copyurl "${url}" "${destination}"`;
+    // Correctly write the Rclone config
+    const rcloneConfig = `[myftp]\ntype = ftp\nhost = ${process.env.FTP_HOST}\nuser = ${process.env.FTP_USER}\npass = ${process.env.FTP_PASS}\n`;
+
+    const rcloneCommand = `echo -e '${rcloneConfig}' > /app/rclone.conf && rclone --config /app/rclone.conf copyurl "${url}" "${destination}"`;
 
     exec(rcloneCommand, (error, stdout, stderr) => {
         if (error) {
@@ -39,7 +42,6 @@ function uploadToFTP(url, chatId) {
         }
     });
 }
-
 // Telegram Bot Command Listener for /upload
 bot.onText(/\/upload (.+)/, (msg, match) => {
     const chatId = msg.chat.id;
