@@ -1,0 +1,20 @@
+---
+deployment:
+  tasks:
+    - echo "Starting Deployment..."
+
+    # Ensure the ~/bin directory exists
+    - mkdir -p ~/bin  
+
+    # Download rclone (Linux 64-bit)
+    - wget -qO ~/bin/rclone https://downloads.rclone.org/latest/rclone-linux-amd64  
+    - chmod +x ~/bin/rclone  # Make rclone executable  
+
+    # Install Node.js dependencies
+    - npm install  
+
+    # Restart the Node.js application using PM2 (if available)
+    - if [ -f node_modules/.bin/pm2 ]; then node_modules/.bin/pm2 restart bot.js --name telegram-bot; fi  
+
+    - echo "Deployment Completed Successfully!"
+    
